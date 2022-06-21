@@ -1,0 +1,3 @@
+helm/jenkins/configs/*.txt
+docker/*.txt
+secrets/*.txt

@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jenkins
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: jenkins
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: jenkins-controller
+data:
+  apply_config.sh: |-
+{{ .Files.Get "configs/apply_config.sh" | indent 4 }}
+  jcasc-default-config.yaml: |-
+{{ .Files.Get "configs/jcasc-default-config.txt" | indent 4 }}

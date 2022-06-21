@@ -1,0 +1,3 @@
+**
+!docker/**
+!pki/certs/ca-certificates.crt

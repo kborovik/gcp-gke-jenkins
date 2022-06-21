@@ -1,0 +1,9 @@
+# All values set in Makefile
+adminUser: null
+adminPassword: null
+registry_key: null
+controllerImage: null
+agentImage: null
+keyStoreFile: null
+keyStorePass: null
+loadBalancerIP: null

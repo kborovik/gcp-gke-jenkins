@@ -1,0 +1,47 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jenkins
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: jenkins
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: jenkins-controller
+  annotations:
+    networking.gke.io/internal-load-balancer-allow-global-access: "true"
+    networking.gke.io/load-balancer-type: "Internal"
+spec:
+  type: LoadBalancer
+  loadBalancerIP: {{ .Values.loadBalancerIP }}
+  externalTrafficPolicy: Local
+  ports:
+    - port: 443
+      name: https
+      targetPort: 8443
+    - port: 22
+      name: ssh
+      targetPort: 2222
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: jenkins-controller
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jenkins-agent
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: jenkins
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: jenkins-controller
+spec:
+  ports:
+    - port: 50000
+      targetPort: 50000
+      name: agent-listener
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: jenkins-controller
+  type: ClusterIP

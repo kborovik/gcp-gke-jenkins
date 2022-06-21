@@ -1,0 +1,33 @@
+ARG jenkins_ver=2.332.3
+
+FROM jenkins/jenkins:${jenkins_ver}-lts
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+USER root
+
+COPY --chown=root:root pki/certs/ca-certificates.crt /usr/local/share/ca-certificates/
+
+RUN usermod -u 2139797 jenkins && groupmod -g 2139797 jenkins &&\
+  mkdir /proj &&\
+  chown -R jenkins:jenkins /usr/share/jenkins/ref /var/jenkins_home /proj
+
+RUN apt-get -y update && \
+  apt-get -y install curl vim ca-certificates-java &&\
+  update-ca-certificates
+
+RUN keytool -importcert -noprompt -trustcacerts -alias "Lab5 DevOps Inc. - Root CA"  -storepass changeit -keystore /opt/java/openjdk/lib/security/cacerts -file /usr/local/share/ca-certificates/ca-certificates.crt
+
+USER jenkins
+
+COPY --chown=jenkins:jenkins docker/github-ssh-key.groovy.txt /usr/share/jenkins/ref/init.groovy.d/github-ssh-key.groovy
+
+RUN echo "alias ls='ls --color -F'; alias ll='ls -lh'" > /var/jenkins_home/.bashrc
+
+RUN jenkins-plugin-cli --latest true --plugins \
+  kubernetes:1.31.3 \
+  workflow-aggregator:2.7 \
+  git:4.11.1 \
+  configuration-as-code:1414.v878271fc496f
+
+WORKDIR /var/jenkins_home

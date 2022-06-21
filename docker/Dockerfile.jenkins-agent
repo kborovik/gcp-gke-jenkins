@@ -1,0 +1,19 @@
+ARG jenkins_agent_ver=4.11.2-4
+
+FROM jenkins/inbound-agent:${jenkins_agent_ver}
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+USER root
+
+COPY --chown=root:root pki/certs/ca-certificates.crt /usr/local/share/ca-certificates/
+
+RUN apt-get -y update && \
+  apt-get -y install curl && \
+  update-ca-certificates
+
+RUN keytool -importcert -noprompt -trustcacerts -alias "Lab5 DevOps Inc. - Root CA"  -storepass changeit -keystore /opt/java/openjdk/lib/security/cacerts -file /usr/local/share/ca-certificates/ca-certificates.crt
+
+RUN usermod -u 2139797 jenkins && groupmod -g 2139797 jenkins && chown -R jenkins:jenkins /home/jenkins
+
+USER jenkins

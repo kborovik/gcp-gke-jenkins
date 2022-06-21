@@ -1,0 +1,158 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: jenkins
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: jenkins
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: jenkins-controller
+spec:
+  serviceName: jenkins
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: jenkins-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: jenkins
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: jenkins-controller
+    spec:
+      serviceAccountName: jenkins
+      imagePullSecrets:
+      - name: gcp-registry
+      securityContext:
+        runAsUser: 2139797
+        fsGroup: 2139797
+        runAsNonRoot: true
+      initContainers:
+        - name: init
+          image: {{ .Values.controllerImage }}
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 2139797
+            runAsUser: 2139797
+          command: [ "/bin/bash", "/var/jenkins_config/apply_config.sh" ]
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+            requests:
+              cpu: 1000m
+              memory: 2Gi
+          volumeMounts:
+            - mountPath: /var/jenkins_home
+              name: jenkins-home
+              readOnly: false
+            - mountPath: /var/jenkins_config
+              name: jenkins-config
+              readOnly: true
+      containers:
+        - name: jenkins
+          image: {{ .Values.controllerImage }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 2139797
+            runAsUser: 2139797
+          args:
+            - --httpsPort=8443
+            - --httpPort=8080
+            - --httpsKeyStore=/var/jenkins_keystore/keystore.jks
+            - --httpsKeyStorePassword=$(JENKINS_HTTPS_KEYSTORE_PASSWORD)
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: JENKINS_OPTS
+              value: >-
+                 --webroot=/var/jenkins_cache/war 
+            - name: JENKINS_SLAVE_AGENT_PORT
+              value: "50000"
+            - name: JENKINS_HTTPS_KEYSTORE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name:  jenkins-https-jks  
+                  key: jenkins-jks-pass
+            - name: CASC_JENKINS_CONFIG
+              value: /var/jenkins_config/jcasc-default-config.yaml
+          ports:
+            - containerPort: 8080
+              name: http
+            - containerPort: 8443
+              name: https
+            - containerPort: 2222
+              name: ssh
+            - containerPort: 50000
+              name: agent-listener
+          startupProbe:
+            failureThreshold: 3
+            httpGet:
+              path: '/login'
+              port: 8080
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: '/login'
+              port: 8080
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 8Gi
+            requests:
+              cpu: 1000m
+              memory: 4Gi
+          volumeMounts:
+            - mountPath: /var/jenkins_home
+              name: jenkins-home
+              readOnly: false
+            - mountPath: /var/jenkins_keystore
+              name: jenkins-https-keystore
+              readOnly: true
+            - mountPath: /var/jenkins_config
+              name: jenkins-config
+              readOnly: true
+            - name: admin-secret
+              mountPath: /run/secrets/chart-admin-username
+              subPath: jenkins-admin-user
+              readOnly: true
+            - name: admin-secret
+              mountPath: /run/secrets/chart-admin-password
+              subPath: jenkins-admin-password
+              readOnly: true
+            - name: jenkins-cache
+              mountPath: /var/jenkins_cache
+            - mountPath: /tmp
+              name: tmp-volume
+      volumes:
+      - name: jenkins-config
+        configMap:
+          name: jenkins
+      - name: jenkins-cache
+        emptyDir: {}
+      - name: jenkins-home
+        persistentVolumeClaim:
+          claimName: jenkins
+      - name: tmp-volume
+        emptyDir: {}
+      - name: jenkins-https-keystore
+        secret:
+          secretName: jenkins-https-jks  
+          items:
+          - key: jenkins-jks-file
+            path: keystore.jks
+      - name: admin-secret
+        secret:
+          secretName: jenkins

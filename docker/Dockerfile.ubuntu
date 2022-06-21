@@ -1,0 +1,19 @@
+FROM ubuntu:20.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+COPY --chown=root:root pki/certs/ca-certificates.crt /usr/local/share/ca-certificates/
+
+RUN apt-get -y update && \
+  apt-get -y install wget gpg curl bash-completion git make ca-certificates && \
+  update-ca-certificates && \
+  apt-get -y autoremove && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd --gid 2139797 jenkins &&\
+  useradd --uid 2139797  --gid 2139797 --create-home jenkins
+
+USER jenkins
+
+WORKDIR /home/jenkins
+
+ENTRYPOINT [ "/usr/bin/env" ]

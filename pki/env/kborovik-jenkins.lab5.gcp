@@ -1,0 +1,2 @@
+export PKI_CN=kborovik-jenkins.lab5.gcp
+export PKI_SAN=DNS:kborovik-jenkins.lab5.gcp,IP:127.0.0.1

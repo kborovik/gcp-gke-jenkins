@@ -1,0 +1,6 @@
+apiVersion: v2
+name: jenkins
+description: Jenkins Configuration as Code
+type: application
+version: 1.0.0
+appVersion: 2.332.3

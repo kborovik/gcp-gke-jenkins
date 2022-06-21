@@ -1,0 +1,103 @@
+jenkins:
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+  securityRealm:
+    local:
+      allowsSignup: false
+      enableCaptcha: false
+      users:
+        - id: "${admin_user}"
+          name: "Jenkins Admin"
+          password: "${admin_pass}"
+          properties:
+            - sshPublicKey:
+                authorizedKeys: |
+                  ${admin_ssh}
+  disableRememberMe: false
+  mode: NORMAL
+  numExecutors: 0
+  labelString: ""
+  projectNamingStrategy: "standard"
+  markupFormatter: plainText
+  clouds:
+    - kubernetes:
+        name: "kubernetes"
+        namespace: "${gke_namespace}"
+        serverUrl: "https://kubernetes.default"
+        jenkinsUrl: "https://jenkins.${gke_namespace}.svc.cluster.local"
+        jenkinsTunnel: "jenkins-agent.${gke_namespace}.svc.cluster.local:50000"
+        containerCapStr: "10"
+        defaultsProviderTemplate: "kaniko"
+        connectTimeout: "5"
+        readTimeout: "15"
+        maxRequestsPerHostStr: "32"
+        podLabels:
+          - key: "app.kubernetes.io/name"
+            value: "jenkins"
+          - key: "app.kubernetes.io/component"
+            value: "jenkins-controller"
+        waitForPodSec: 30
+        skipTlsVerify: false
+        templates:
+          - name: "kaniko"
+            idleMinutesStr: "0"
+            instanceCapStr: "128"
+            label: "jenkins-agent"
+            nodeUsageMode: "NORMAL"
+            podRetention: "Never"
+            serviceAccount: "jenkins"
+            showRawYaml: true
+            slaveConnectTimeoutStr: "86400"
+            yamlMergeStrategy: "merge"
+            terminationGracePeriodSeconds: 30
+            imagePullSecrets:
+              - name: "gcp-registry"
+            containers:
+              - name: "jnlp"
+                image: "${jenkins_agent_img}"
+                alwaysPullImage: true
+                command: "/usr/local/bin/jenkins-agent"
+                envVars:
+                  - envVar:
+                      key: "JENKINS_URL"
+                      value: "https://jenkins.${gke_namespace}.svc.cluster.local"
+                resourceLimitCpu: "0.5"
+                resourceLimitMemory: "1Gi"
+                resourceRequestCpu: "0.5"
+                resourceRequestMemory: "1Gi"
+                privileged: false
+                runAsUser: 2139797
+                runAsGroup: 2139797
+                ttyEnabled: false
+                workingDir: "/home/jenkins/agent"
+
+              - name: "ubuntu"
+                image: "${ubuntu_img}"
+                alwaysPullImage: true
+                command: "/usr/bin/cat"
+                resourceLimitCpu: "2"
+                resourceLimitMemory: "4Gi"
+                resourceRequestCpu: "1"
+                resourceRequestMemory: "2Gi"
+                privileged: false
+                runAsUser: 2139797
+                runAsGroup: 2139797
+                ttyEnabled: true
+
+  crumbIssuer:
+    standard:
+      excludeClientIPFromCrumb: true
+
+security:
+  apiToken:
+    creationOfLegacyTokenEnabled: false
+    tokenGenerationOnCreationEnabled: false
+    usageStatisticsEnabled: true
+  sSHD:
+    port: 2222
+
+unclassified:
+  location:
+    adminAddress: kb@lab5.ca
+    url: "https://${jenkins_ip}"
