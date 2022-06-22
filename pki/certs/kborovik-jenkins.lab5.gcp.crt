@@ -1,0 +1,87 @@
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number: 1 (0x1)
+        Signature Algorithm: sha256WithRSAEncryption
+        Issuer: DC=ca, DC=lab5, O=Lab5 DevOps Inc., OU=www.lab5.ca, CN=Issuing CA 2022
+        Validity
+            Not Before: Jun 22 18:55:32 2022 GMT
+            Not After : Jun 21 18:55:32 2024 GMT
+        Subject: DC=ca, DC=lab5, O=Lab5 DevOps Inc., OU=www.lab5.ca, CN=kborovik-jenkins.lab5.gcp
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                RSA Public-Key: (2048 bit)
+                Modulus:
+                    00:98:35:6d:a0:74:31:23:06:b4:59:c2:99:f9:55:
+                    0a:e2:56:a8:3b:e5:f7:4e:61:88:cc:9f:40:60:ba:
+                    ed:2d:1a:5f:77:c7:c2:7c:27:6e:3b:e4:da:ca:61:
+                    cd:1e:b2:43:9b:5e:3b:cd:a6:fb:d2:ee:5a:35:ac:
+                    04:15:17:98:79:b6:01:a1:4e:b9:2a:e1:06:0e:1b:
+                    cd:b0:ba:fe:90:fe:6b:95:24:f1:62:6e:16:97:aa:
+                    57:5f:b6:fa:c4:41:0a:36:b4:03:1a:80:b6:ec:ea:
+                    fa:b3:96:c9:cc:2a:c7:7e:36:92:e2:11:4a:27:49:
+                    eb:c8:6e:a4:75:7f:5e:8d:c6:b6:f3:79:64:c0:d3:
+                    fa:67:60:24:95:b3:fc:5b:f6:a3:67:74:62:cc:5b:
+                    df:58:a4:f3:09:b7:4c:ab:6b:96:17:10:18:c8:bd:
+                    e1:ec:58:64:96:63:3c:1d:a8:be:c8:80:e9:a5:12:
+                    64:66:9a:20:07:5c:d9:12:d4:76:c8:fe:4a:81:e0:
+                    e3:3d:82:20:0d:36:89:56:7e:ce:b7:f7:87:c9:63:
+                    b5:ea:df:ae:9e:ef:0e:08:6b:fc:64:7d:27:de:14:
+                    16:d8:d1:98:d8:46:d7:03:e9:8d:b0:fa:45:10:47:
+                    76:f4:66:cb:17:4d:84:9d:56:80:c3:d2:74:66:e2:
+                    c1:37
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Key Usage: critical
+                Digital Signature, Key Encipherment
+            X509v3 Basic Constraints: 
+                CA:FALSE
+            X509v3 Extended Key Usage: 
+                TLS Web Server Authentication, TLS Web Client Authentication
+            X509v3 Subject Key Identifier: 
+                2A:34:BD:D4:0D:8B:D3:02:A3:AA:4C:D2:B5:A1:93:72:53:09:21:99
+            X509v3 Authority Key Identifier: 
+                keyid:7E:10:7E:9A:F1:D0:36:59:CA:14:25:9B:4B:DC:EB:6C:00:69:C8:AE
+
+            X509v3 Subject Alternative Name: 
+                DNS:kborovik-jenkins.lab5.gcp, IP Address:127.0.0.1
+    Signature Algorithm: sha256WithRSAEncryption
+         bc:2c:4a:14:4a:ff:00:dc:61:49:bd:81:20:47:50:eb:32:a4:
+         ca:41:5d:d1:bd:73:f4:85:ab:71:05:7f:d2:1a:df:1b:3c:80:
+         83:12:ee:0e:0f:f1:71:27:3e:52:d6:28:83:69:51:a7:02:27:
+         52:7a:60:21:13:89:99:b5:4c:a4:62:d7:c7:4c:ba:36:c8:37:
+         0d:5f:99:6b:61:cf:f7:51:c6:cb:5b:23:9a:8a:74:8d:50:af:
+         b7:c0:f2:50:98:73:b0:aa:1a:44:4c:cd:03:79:33:68:74:82:
+         c1:25:d3:ba:22:47:fd:72:2c:6b:54:bc:40:da:6a:be:42:cf:
+         1b:ab:67:bb:ea:d7:0d:e9:61:10:a1:fa:32:dd:bc:81:96:6a:
+         9f:de:14:77:d6:26:b8:a5:42:26:6a:11:bc:40:77:fe:7d:0d:
+         ec:92:0e:46:dd:cb:99:ed:c8:2c:dd:db:5b:1a:0f:92:bb:85:
+         90:c1:a4:90:78:1d:18:5c:f5:12:2d:d0:ed:8c:cc:88:fb:c0:
+         27:8c:da:78:58:34:5a:16:1b:cf:d8:08:9e:a9:23:64:76:ed:
+         85:a2:cb:aa:da:b9:fb:25:a0:c7:73:4a:ae:45:84:c7:40:f8:
+         f3:0f:e4:f5:eb:c2:b6:ae:7c:a6:a0:55:7c:2d:5e:f5:ea:9a:
+         ad:c8:e5:99
+-----BEGIN CERTIFICATE-----
+MIIEGTCCAwGgAwIBAgIBATANBgkqhkiG9w0BAQsFADB1MRIwEAYKCZImiZPyLGQB
+GRYCY2ExFDASBgoJkiaJk/IsZAEZFgRsYWI1MRkwFwYDVQQKDBBMYWI1IERldk9w
+cyBJbmMuMRQwEgYDVQQLDAt3d3cubGFiNS5jYTEYMBYGA1UEAwwPSXNzdWluZyBD
+QSAyMDIyMB4XDTIyMDYyMjE4NTUzMloXDTI0MDYyMTE4NTUzMlowfzESMBAGCgmS
+JomT8ixkARkWAmNhMRQwEgYKCZImiZPyLGQBGRYEbGFiNTEZMBcGA1UECgwQTGFi
+NSBEZXZPcHMgSW5jLjEUMBIGA1UECwwLd3d3LmxhYjUuY2ExIjAgBgNVBAMMGWti
+b3JvdmlrLWplbmtpbnMubGFiNS5nY3AwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAw
+ggEKAoIBAQCYNW2gdDEjBrRZwpn5VQriVqg75fdOYYjMn0Bguu0tGl93x8J8J247
+5NrKYc0eskObXjvNpvvS7lo1rAQVF5h5tgGhTrkq4QYOG82wuv6Q/muVJPFibhaX
+qldftvrEQQo2tAMagLbs6vqzlsnMKsd+NpLiEUonSevIbqR1f16NxrbzeWTA0/pn
+YCSVs/xb9qNndGLMW99YpPMJt0yra5YXEBjIveHsWGSWYzwdqL7IgOmlEmRmmiAH
+XNkS1HbI/kqB4OM9giANNolWfs6394fJY7Xq366e7w4Ia/xkfSfeFBbY0ZjYRtcD
+6Y2w+kUQR3b0ZssXTYSdVoDD0nRm4sE3AgMBAAGjgakwgaYwDgYDVR0PAQH/BAQD
+AgWgMAkGA1UdEwQCMAAwHQYDVR0lBBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMB0G
+A1UdDgQWBBQqNL3UDYvTAqOqTNK1oZNyUwkhmTAfBgNVHSMEGDAWgBR+EH6a8dA2
+WcoUJZtL3OtsAGnIrjAqBgNVHREEIzAhghlrYm9yb3Zpay1qZW5raW5zLmxhYjUu
+Z2NwhwR/AAABMA0GCSqGSIb3DQEBCwUAA4IBAQC8LEoUSv8A3GFJvYEgR1DrMqTK
+QV3RvXP0hatxBX/SGt8bPICDEu4OD/FxJz5S1iiDaVGnAidSemAhE4mZtUykYtfH
+TLo2yDcNX5lrYc/3UcbLWyOainSNUK+3wPJQmHOwqhpETM0DeTNodILBJdO6Ikf9
+cixrVLxA2mq+Qs8bq2e76tcN6WEQofoy3byBlmqf3hR31ia4pUImahG8QHf+fQ3s
+kg5G3cuZ7cgs3dtbGg+Su4WQwaSQeB0YXPUSLdDtjMyI+8AnjNp4WDRaFhvP2Aie
+qSNkdu2Fosuq2rn7JaDHc0quRYTHQPjzD+T168K2rnymoFV8LV716pqtyOWZ
+-----END CERTIFICATE-----
