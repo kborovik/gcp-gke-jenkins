@@ -1,3 +1,6 @@
 helm/jenkins/configs/*.txt
 docker/*.txt
 secrets/*.txt
+terraform/*.json
+terraform/.terraform
+terraform/.terraform.lock.hcl
