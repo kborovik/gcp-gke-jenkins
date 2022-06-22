@@ -28,10 +28,10 @@ terraform_output_remote := gs://terraform-$(gcp_project)/jenkins/output.json
 
 gcp_project_config := $(terraform_dir)/$(gcp_project).tfvars
 
+registry := $(gcp_region)-docker.pkg.dev/$(gcp_project)/docker
+
 ifneq ($(file < $(terraform_output_local)),)
-gcp_region := $(shell jq -r ".google_region.value // empty" $(terraform_output_local))
 gke_name := $(shell jq -r ".gke_name.value // empty" $(terraform_output_local))
-registry ?= $(gcp_region)-docker.pkg.dev/$(gcp_project)/jenkins-docker
 endif
 
 jenkins_img       := $(registry)/jenkins:$(jenkins_ver)-$(gke_namespace)
@@ -58,22 +58,23 @@ github_ssh_key := $(file < ${HOME}/.ssh/id_rsa)
 settings: secrets-clean
 	$(call header,Settings)
 	echo "#"
-	echo "# gcp_project       = $(gcp_project)"
-	echo "# gke_name          = $(gke_name)"
-	echo "# gke_namespace     = $(gke_namespace)"
+	echo "# gcp_project        = $(gcp_project)"
+	echo "# gcp_project_config = $(gcp_project_config)"
+	echo "# gke_name           = $(gke_name)"
+	echo "# gke_namespace      = $(gke_namespace)"
 	echo "#"
-	echo "# jenkins_ver       = $(jenkins_ver)"
-	echo "# jenkins_agent_ver = $(jenkins_agent_ver)"
-	echo "# jenkins_dns       = $(jenkins_dns)"
-	echo "# jenkins_ip        = $(jenkins_ip)"
-	echo "# admin_user        = $(admin_user)"
-	echo "# admin_pass        = $(admin_pass)"
+	echo "# jenkins_ver        = $(jenkins_ver)"
+	echo "# jenkins_agent_ver  = $(jenkins_agent_ver)"
+	echo "# jenkins_dns        = $(jenkins_dns)"
+	echo "# jenkins_ip         = $(jenkins_ip)"
+	echo "# admin_user         = $(admin_user)"
+	echo "# admin_pass         = $(admin_pass)"
 	echo "#"
-	echo "# registry          = $(registry)"
-	echo "# jenkins_img       = $(jenkins_img)"
-	echo "# jenkins_agent_img = $(jenkins_agent_img)"
+	echo "# registry           = $(registry)"
+	echo "# jenkins_img        = $(jenkins_img)"
+	echo "# jenkins_agent_img  = $(jenkins_agent_img)"
 	echo "#"
-	echo "# PKI_SAN           = $(PKI_SAN)"
+	echo "# PKI_SAN            = $(PKI_SAN)"
 	echo "#"
 
 ###############################################################################
@@ -82,7 +83,7 @@ settings: secrets-clean
 
 all: secrets-clean prompt docker ssl helm test
 
-clean: helm-clean docker-clean secrets-clean
+clean: secrets-clean helm-clean docker-clean
 
 ###############################################################################
 # Secrets. Variable values stored in secrets.enc
@@ -91,7 +92,7 @@ secrets_enc := secrets/$(gke_namespace).enc
 secrets_txt := secrets/$(gke_namespace).txt
 
 $(secrets_txt):
-	openssl enc -d -aes128 -pbkdf2 -base64 -in $(secrets_enc) -pass pass:$(master_key) -out $@ || shred -uf $(secrets_txt)
+	openssl enc -d -aes128 -pbkdf2 -base64 -in $(secrets_enc) -pass pass:$(master_key) -out $@
 
 $(secrets_enc): $(secrets_txt)
 	openssl enc -aes128 -pbkdf2 -base64 -in $(secrets_txt) -pass pass:$(master_key) -out $@ && shred -uf $(secrets_txt)
@@ -110,7 +111,7 @@ include $(secrets_txt)
 ###############################################################################
 terraform: terraform-apply
 
-terraform-fmt: secrets-clean
+terraform-fmt:
 	$(call header,Checking Terraform Code Formatting)
 	cd $(terraform_dir)
 	terraform fmt -check
@@ -118,17 +119,17 @@ terraform-fmt: secrets-clean
 terraform-init: terraform-fmt
 	$(call header,Running Terraform Init)
 	cd $(terraform_dir)
-	terraform init -upgrade -input=false -reconfigure -backend-config="bucket=terraform-${gcp_project}" -backend-config="prefix=ptd-ii"
+	terraform init -upgrade -input=false -reconfigure -backend-config="bucket=terraform-${gcp_project}" -backend-config="prefix=jenkins"
 
 terraform-plan: terraform-init
 	$(call header,Running Terraform Plan)
 	cd $(terraform_dir)
-	terraform plan -var-file="${google_project_config}" -input=false -refresh=true
+	terraform plan -var-file="${gcp_project_config}" -input=false -refresh=true
 
 terraform-apply: terraform-init
 	$(call header,Running Terraform Apply)
 	cd $(terraform_dir)
-	terraform apply -auto-approve -var-file="${google_project_config}" -input=false -refresh=true && terraform output -json -no-color > ${terraform_output_local}
+	terraform apply -auto-approve -var-file="${gcp_project_config}" -input=false -refresh=true && terraform output -json -no-color > ${terraform_output_local}
 
 terraform-show:
 	cd $(terraform_dir)
@@ -138,19 +139,19 @@ terraform-state:
 	cd $(terraform_dir)
 	terraform state list
 
-terraform-destory: proxy-down
+terraform-destory:
 	cd $(terraform_dir)
-	terraform plan -destroy -var-file="${google_project_config}" -compact-warnings -out tfplan.bin -target="google_container_cluster.elastic2"
+	terraform plan -destroy -var-file="${gcp_project_config}" -compact-warnings -out tfplan.bin -target="google_container_node_pool.gke1p1" -target="google_container_cluster.gke1" -target="google_compute_instance.gke_proxy1"
 	terraform apply -destroy tfplan.bin
 	rm -rf tfplan.bin
 
 terraform-clean:
-	-rm -rf ${terraform_output_local} ${KUBECONFIG} ${terraform_dir}/.terraform.lock.hcl ${terraform_dir}/.terraform
+	-rm -rf ${terraform_output_local} ${terraform_dir}/.terraform.lock.hcl ${terraform_dir}/.terraform
 
 ###############################################################################
 # Docker
 ###############################################################################
-docker: docker-build-jenkins docker-build-jenkins-agent docker-build-ubuntu docker-build-kaniko secrets-clean
+docker: secrets-clean docker-build-jenkins docker-build-jenkins-agent docker-build-ubuntu docker-build-kaniko
 
 # docker_mount += --mount type=volume,source=kaniko-cache,destination=/cache
 docker_mount += --mount type=bind,source=$${HOME}/.docker,destination=/kaniko/.docker
@@ -159,7 +160,7 @@ docker_mount += --mount type=bind,source=$$(pwd),destination=/workspace
 docker_build_arg += --build-arg=kaniko_ver=$(kaniko_ver)
 docker_build_arg += --build-arg=registry_key=$(registry_key)
 
-docker-envsubst: secrets-clean
+docker-envsubst:
 	envsubst '$${github_ssh_key} $${gke_namespace}' < docker/github-ssh-key.groovy > docker/github-ssh-key.groovy.txt
 
 docker-build-jenkins: docker-envsubst
@@ -202,13 +203,10 @@ shell-jenkins-agent:
 shell-ubuntu:
 	docker run -it --rm $(ubuntu_img) bash
 
-shell-kaniko:
-	docker run -it --rm --entrypoint /busybox/sh $(docker_mount) $(kaniko_img)
-
 ###############################################################################
 # SSL/TLS Certificates
 ###############################################################################
-ssl: ssl-create-jks secrets-clean
+ssl: secrets-clean ssl-create-jks
 
 ssl_key := pki/certs/$(jenkins_dns).key
 ssl_csr := pki/certs/$(jenkins_dns).csr
@@ -255,7 +253,7 @@ gke-credentials: $(KUBECONFIG)
 ###############################################################################
 # Helm
 ###############################################################################
-helm: helm-deploy secrets-clean
+helm: secrets-clean helm-deploy
 
 helm_release := jenkins
 helm_dir := helm/jenkins
@@ -266,11 +264,13 @@ helm_vars += --set agentImage=$(jenkins_agent_img)
 helm_vars += --set adminUser=$(admin_user)
 helm_vars += --set adminPassword=$(admin_pass)
 helm_vars += --set loadBalancerIP=$(jenkins_ip)
-helm_vars += --set keyStoreFile=$(shell base64 --wrap=0 $(ssl_jks))
 helm_vars += --set keyStorePass=$(master_key)
+ifeq ($(wildcard $(ssl_jks)),)
+helm_vars += --set keyStoreFile=$(shell base64 --wrap=0 $(ssl_jks))
+endif
 
-helm-bootstrap: secrets-clean
-	envsubst '$${admin_user} $${admin_pass} $${admin_ssh} $${gke_namespace} $${kaniko_img} $${ubuntu_img} $${jenkins_img} $${jenkins_agent_img} $${jenkins_ip}' < $(helm_dir)/configs/jcasc-default-config.yaml > $(helm_dir)/configs/jcasc-default-config.txt
+helm-bootstrap:
+	envsubst '$${admin_user} $${admin_pass} $${admin_ssh} $${gke_namespace} $${ubuntu_img} $${jenkins_img} $${jenkins_agent_img} $${jenkins_ip}' < $(helm_dir)/configs/jcasc-default-config.yaml > $(helm_dir)/configs/jcasc-default-config.txt
 
 helm-deploy: helm-bootstrap
 	$(call header,Deploy Jenkins HELM Chart)
@@ -301,11 +301,11 @@ helm-restart:
 ###############################################################################
 test: secrets-clean test-jenkins-https test-remove-know-hosts test-reload-jcasc test-add-jenkins-job test-start-jenkins-job test-view-jenkins-job
 
-test-jenkins-https: secrets-clean
+test-jenkins-https:
 	$(call header,Test Jenkins HTTPS Access)
 	curl -X GET -I -L https://$(jenkins_ip)/login
 
-test-remove-know-hosts: secrets-clean
+test-remove-know-hosts:
 	ssh-keygen -f ${HOME}/.ssh/known_hosts -R ${jenkins_ip} >/dev/null
 
 test-reload-jcasc:
@@ -378,7 +378,7 @@ $(error master_key is not set. Run | mkdir -p ${HOME}/.secrets/jenkins && echo "
 endif
 
 ifeq ($(wildcard $(secrets_enc)),)
-$(error File '$(secrets_enc)' not found. Run | touch $(secrets_enc) && sleep 2 && echo "admin_pass := ''" > $(secrets_txt) && make secrets-encrypt |)
+$(error File '$(secrets_enc)' not found. Run | touch $(secrets_enc) && sleep 2 && echo "admin_pass := BlueCat" > $(secrets_txt) && make secrets-encrypt |)
 endif
 
 ifeq ($(file < $(gcp_project_config)),)
