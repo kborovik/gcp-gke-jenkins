@@ -5,22 +5,37 @@
 SHELL := /bin/bash
 
 ###############################################################################
-# Environment Variables
+# Software versions
 ###############################################################################
-gcp_project ?= lab5-jenkins-d1
-gcp-region ?= us-central1
-gke_name ?= jnks-d1
-gke_namespace ?= $(shell id --user --name)
-
 jenkins_ver := 2.332.3
 jenkins_agent_ver := 4.11.2-4
 ubuntu_ver := 20.04
 
-registry := 
+###############################################################################
+# Dynamic Environment Variables
+###############################################################################
+gke_namespace ?= $(shell id --user --name)
+
+###############################################################################
+# Static Environment Variables
+###############################################################################
+gcp_project ?= lab5-jenkins-d1
+gcp_region ?= us-central1
+
+terraform_dir := $(abspath terraform)
+terraform_output_local := $(terraform_dir)/output.json
+terraform_output_remote := gs://terraform-$(gcp_project)/jenkins/output.json
+
+gcp_project_config := $(terraform_dir)/$(gcp_project).tfvars
+
+ifneq ($(file < $(terraform_output_local)),)
+gcp_region := $(shell jq -r ".google_region.value // empty" $(terraform_output_local))
+gke_name := $(shell jq -r ".gke_name.value // empty" $(terraform_output_local))
+registry ?= $(gcp_region)-docker.pkg.dev/$(gcp_project)/jenkins-docker
+endif
 
 jenkins_img       := $(registry)/jenkins:$(jenkins_ver)-$(gke_namespace)
 jenkins_agent_img := $(registry)/jenkins-agent:$(jenkins_agent_ver)-$(gke_namespace)
-kaniko_img        := $(registry)/kaniko:$(kaniko_ver)-$(gke_namespace)
 ubuntu_img        := $(registry)/ubuntu:$(ubuntu_ver)-$(gke_namespace)
 
 ###############################################################################
@@ -42,19 +57,24 @@ github_ssh_key := $(file < ${HOME}/.ssh/id_rsa)
 ###############################################################################
 settings: secrets-clean
 	$(call header,Settings)
+	echo "#"
 	echo "# gcp_project       = $(gcp_project)"
 	echo "# gke_name          = $(gke_name)"
 	echo "# gke_namespace     = $(gke_namespace)"
+	echo "#"
 	echo "# jenkins_ver       = $(jenkins_ver)"
 	echo "# jenkins_agent_ver = $(jenkins_agent_ver)"
 	echo "# jenkins_dns       = $(jenkins_dns)"
 	echo "# jenkins_ip        = $(jenkins_ip)"
 	echo "# admin_user        = $(admin_user)"
 	echo "# admin_pass        = $(admin_pass)"
+	echo "#"
 	echo "# registry          = $(registry)"
 	echo "# jenkins_img       = $(jenkins_img)"
 	echo "# jenkins_agent_img = $(jenkins_agent_img)"
+	echo "#"
 	echo "# PKI_SAN           = $(PKI_SAN)"
+	echo "#"
 
 ###############################################################################
 # All
@@ -86,11 +106,51 @@ secrets-clean:
 include $(secrets_txt)
 
 ###############################################################################
+# Terraform
+###############################################################################
+terraform: terraform-apply
+
+terraform-fmt: secrets-clean
+	$(call header,Checking Terraform Code Formatting)
+	cd $(terraform_dir)
+	terraform fmt -check
+
+terraform-init: terraform-fmt
+	$(call header,Running Terraform Init)
+	cd $(terraform_dir)
+	terraform init -upgrade -input=false -reconfigure -backend-config="bucket=terraform-${gcp_project}" -backend-config="prefix=ptd-ii"
+
+terraform-plan: terraform-init
+	$(call header,Running Terraform Plan)
+	cd $(terraform_dir)
+	terraform plan -var-file="${google_project_config}" -input=false -refresh=true
+
+terraform-apply: terraform-init
+	$(call header,Running Terraform Apply)
+	cd $(terraform_dir)
+	terraform apply -auto-approve -var-file="${google_project_config}" -input=false -refresh=true && terraform output -json -no-color > ${terraform_output_local}
+
+terraform-show:
+	cd $(terraform_dir)
+	terraform show
+
+terraform-state:
+	cd $(terraform_dir)
+	terraform state list
+
+terraform-destory: proxy-down
+	cd $(terraform_dir)
+	terraform plan -destroy -var-file="${google_project_config}" -compact-warnings -out tfplan.bin -target="google_container_cluster.elastic2"
+	terraform apply -destroy tfplan.bin
+	rm -rf tfplan.bin
+
+terraform-clean:
+	-rm -rf ${terraform_output_local} ${KUBECONFIG} ${terraform_dir}/.terraform.lock.hcl ${terraform_dir}/.terraform
+
+###############################################################################
 # Docker
 ###############################################################################
 docker: docker-build-jenkins docker-build-jenkins-agent docker-build-ubuntu docker-build-kaniko secrets-clean
-
-cache_repo := $(registry)/kaniko-cache
 
 # docker_mount += --mount type=volume,source=kaniko-cache,destination=/cache
 docker_mount += --mount type=bind,source=$${HOME}/.docker,destination=/kaniko/.docker
@@ -189,7 +249,7 @@ ssl-show-jks:
 ###############################################################################
 gke-credentials: $(KUBECONFIG)
 	$(call header,Get GKE Credentials)
-	gcloud container clusters get-credentials --zone=$(gcp-region) $(gke_name)
+	gcloud container clusters get-credentials --zone=$(gcp_region) $(gke_name)
 	kubectl config set-context --current --namespace $(gke_namespace)
 
 ###############################################################################
@@ -318,5 +378,9 @@ $(error master_key is not set. Run | mkdir -p ${HOME}/.secrets/jenkins && echo "
 endif
 
 ifeq ($(wildcard $(secrets_enc)),)
-$(error File '$(secrets_enc)' not found. Run | touch $(secrets_enc) && sleep 2 && echo "example := record" > $(secrets_txt) && make secrets-encrypt |)
+$(error File '$(secrets_enc)' not found. Run | touch $(secrets_enc) && sleep 2 && echo "admin_pass := ''" > $(secrets_txt) && make secrets-encrypt |)
+endif
+
+ifeq ($(file < $(gcp_project_config)),)
+$(error Missing Terraform GCP Project config $(gcp_project_config))
 endif
