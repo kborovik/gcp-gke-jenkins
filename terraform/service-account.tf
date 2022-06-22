@@ -4,6 +4,7 @@ Create jenkins SA
 
 */
 resource "google_service_account" "jenkins" {
+  project      = var.google_project_id
   account_id   = "jenkins-01"
   display_name = "jenkins-01"
 }

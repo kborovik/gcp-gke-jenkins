@@ -9,63 +9,45 @@ https://cloud.google.com/architecture/creating-kubernetes-engine-private-cluster
 */
 resource "google_compute_network" "main" {
   name                    = "main"
-  project                 = var.project_id
+  project                 = var.google_project_id
   routing_mode            = "GLOBAL"
   mtu                     = 1460
   auto_create_subnetworks = false
 }
 
-resource "google_compute_subnetwork" "instances" {
-  name                     = "gcp-instances"
-  project                  = var.project_id
-  region                   = var.region
+resource "google_compute_subnetwork" "gke1" {
+  name                     = "gke1"
+  project                  = var.google_project_id
+  region                   = "us-central1"
   network                  = google_compute_network.main.name
   stack_type               = "IPV4_ONLY"
-  ip_cidr_range            = local.instances_cidr
-  private_ip_google_access = true
-}
-
-resource "google_compute_subnetwork" "dataproc" {
-  name                     = "dataproc"
-  project                  = var.project_id
-  region                   = var.region
-  network                  = google_compute_network.main.name
-  stack_type               = "IPV4_ONLY"
-  ip_cidr_range            = local.dataproc_cidr
-  private_ip_google_access = true
-}
-
-resource "google_compute_subnetwork" "gke_nodes" {
-  name                     = "gke-nodes"
-  project                  = var.project_id
-  region                   = var.region
-  network                  = google_compute_network.main.name
-  stack_type               = "IPV4_ONLY"
-  ip_cidr_range            = local.gke_nodes_cidr
+  ip_cidr_range            = "10.128.0.0/21"
   private_ip_google_access = true
 
   secondary_ip_range = [
     {
-      range_name    = "services-gke-01"
-      ip_cidr_range = "100.65.0.0/16"
+      range_name    = "gke1-services"
+      ip_cidr_range = "172.16.0.0/21"
     },
     {
-      range_name    = "pods-gke-01"
-      ip_cidr_range = "100.64.0.0/16"
+      range_name    = "gke1-pods"
+      ip_cidr_range = "172.16.8.0/21"
     },
   ]
 }
 
 resource "google_compute_router" "main" {
   name    = "main"
-  region  = var.region
-  network = google_compute_network.main.id
+  project = var.google_project_id
+  region  = var.google_region
+  network = google_compute_network.main.self_link
 }
 
 resource "google_compute_router_nat" "main" {
   name                               = "main"
   router                             = google_compute_router.main.name
-  region                             = var.region
+  project                            = var.google_project_id
+  region                             = var.google_region
   nat_ip_allocate_option             = "AUTO_ONLY"
   source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
 }
@@ -78,8 +60,8 @@ https://cloud.google.com/load-balancing/docs/health-check-concepts#ip-ranges
 */
 resource "google_compute_firewall" "allow_iap_main" {
   name     = "allow-iap-main"
-  project  = var.project_id
-  network  = google_compute_network.main.self_link
+  project  = var.google_project_id
+  network  = google_compute_network.main.id
   priority = 100
 
   source_ranges = [
@@ -102,8 +84,8 @@ Allow SSH
 */
 resource "google_compute_firewall" "allow_ssh_main" {
   name     = "allow-ssh-main"
-  project  = var.project_id
-  network  = google_compute_network.main.self_link
+  project  = var.google_project_id
+  network  = google_compute_network.main.id
   priority = 200
 
   source_ranges = [
@@ -127,8 +109,8 @@ Allow OpenVPN
 */
 resource "google_compute_firewall" "allow_openvpn_main" {
   name     = "allow-openvpn-main"
-  project  = var.project_id
-  network  = google_compute_network.main.self_link
+  project  = var.google_project_id
+  network  = google_compute_network.main.id
   priority = 300
 
   source_ranges = [
@@ -151,29 +133,5 @@ resource "google_compute_firewall" "allow_openvpn_main" {
 
   log_config {
     metadata = "EXCLUDE_ALL_METADATA"
-  }
-}
-
-/*
-
-Allow Dataproc cluster (dataproc-01) communication
-
-*/
-resource "google_compute_firewall" "allow_dataproc_01" {
-  name     = "allow-dataproc-01"
-  project  = var.project_id
-  network  = google_compute_network.main.self_link
-  priority = 400
-
-  source_ranges = [
-    "10.128.0.0/16"
-  ]
-
-  target_tags = [
-    "dataproc-01",
-  ]
-
-  allow {
-    protocol = "all"
   }
 }

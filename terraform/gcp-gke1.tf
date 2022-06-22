@@ -5,21 +5,20 @@ Google Kubernetes cluster (GKE)
 */
 
 resource "google_container_cluster" "gke1" {
-  name                     = "ptd-ii-01"
-  description              = "PTD-II Microservices"
+  name                     = "jnks-d1"
+  description              = "jnks-d1"
   project                  = var.google_project_id
   location                 = var.google_region
-  network                  = data.google_compute_network.main.self_link
-  subnetwork               = data.google_compute_subnetwork.us_west1.self_link
+  network                  = google_compute_network.main.self_link
+  subnetwork               = google_compute_subnetwork.gke1.self_link
   remove_default_node_pool = true
   initial_node_count       = 1
-  min_master_version       = "1.21"
+  min_master_version       = "1.22"
   enable_shielded_nodes    = true
   datapath_provider        = "ADVANCED_DATAPATH"
 
   resource_labels = {
-    app   = "ptd-ii"
-    owner = "rgitsc"
+    app = "jenkins-d1"
   }
 
   node_locations = [
@@ -33,8 +32,8 @@ resource "google_container_cluster" "gke1" {
   }
 
   ip_allocation_policy {
-    services_secondary_range_name = var.gke_services_range
-    cluster_secondary_range_name  = var.gke_pods_range
+    services_secondary_range_name = "gke1-services"
+    cluster_secondary_range_name  = "gke1-pods"
   }
 
   timeouts {
@@ -79,6 +78,7 @@ resource "google_container_cluster" "gke1" {
 resource "google_container_node_pool" "gke1p1" {
   name               = "p1"
   cluster            = google_container_cluster.gke1.name
+  project            = var.google_project_id
   location           = var.google_region
   initial_node_count = 1
   max_pods_per_node  = 110
