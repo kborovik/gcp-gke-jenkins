@@ -141,7 +141,7 @@ terraform-state:
 
 terraform-destory:
 	cd $(terraform_dir)
-	terraform plan -destroy -var-file="${gcp_project_config}" -compact-warnings -out tfplan.bin -target="google_container_node_pool.gke1p1" -target="google_container_cluster.gke1" -target="google_compute_instance.gke_proxy1"
+	terraform plan -destroy -var-file="${gcp_project_config}" -compact-warnings -out tfplan.bin -target="google_container_node_pool.gke1p1" -target="google_container_cluster.gke1" -target="google_compute_instance.gke_proxy1" -target="google_compute_address.gke_proxy1"
 	terraform apply -destroy tfplan.bin
 	rm -rf tfplan.bin
 
