@@ -32,6 +32,7 @@ registry := $(gcp_region)-docker.pkg.dev/$(gcp_project)/docker
 
 ifneq ($(file < $(terraform_output_local)),)
 gke_name := $(shell jq -r ".gke_name.value // empty" $(terraform_output_local))
+gke_proxy_name := $(shell jq -r ".gke_proxy_name.value // empty" $(terraform_output_local))
 endif
 
 jenkins_img       := $(registry)/jenkins:$(jenkins_ver)-$(gke_namespace)
@@ -62,6 +63,7 @@ settings: secrets-clean
 	echo "# gcp_project_config = $(gcp_project_config)"
 	echo "# gke_name           = $(gke_name)"
 	echo "# gke_namespace      = $(gke_namespace)"
+	echo "# gke_proxy_name     = $(gke_proxy_name)"
 	echo "#"
 	echo "# jenkins_ver        = $(jenkins_ver)"
 	echo "# jenkins_agent_ver  = $(jenkins_agent_ver)"
@@ -81,7 +83,7 @@ settings: secrets-clean
 # All
 ###############################################################################
 
-all: secrets-clean prompt docker ssl helm test
+all: secrets-clean prompt terraform ssl
 
 clean: secrets-clean helm-clean docker-clean
 
@@ -109,7 +111,7 @@ include $(secrets_txt)
 ###############################################################################
 # Terraform
 ###############################################################################
-terraform: terraform-apply
+terraform: secrets-clean terraform-apply
 
 terraform-fmt:
 	$(call header,Checking Terraform Code Formatting)
@@ -141,7 +143,7 @@ terraform-state:
 
 terraform-destory:
 	cd $(terraform_dir)
-	terraform plan -destroy -var-file="${gcp_project_config}" -compact-warnings -out tfplan.bin -target="google_container_node_pool.gke1p1" -target="google_container_cluster.gke1" -target="google_compute_instance.gke_proxy1"
+	terraform plan -destroy -var-file="${gcp_project_config}" -compact-warnings -out tfplan.bin -target="google_container_node_pool.gke1p1" -target="google_container_cluster.gke1" -target="google_compute_instance.gke_proxy1" -target="google_compute_address.gke_proxy1"
 	terraform apply -destroy tfplan.bin
 	rm -rf tfplan.bin
 
@@ -243,12 +245,40 @@ ssl-show-jks:
 	keytool -list -storepass $(master_key) -keystore $(ssl_jks) 2>/dev/null
 
 ###############################################################################
+# GCP Config
+###############################################################################
+gcp-config:
+	$(call header,Setting gcloud config)
+	gcloud config set core/project ${gcp_project}
+	gcloud config set compute/region ${gcp_region}
+
+###############################################################################
 # GKE Credentials
 ###############################################################################
-gke-credentials: $(KUBECONFIG)
+USE_GKE_GCLOUD_AUTH_PLUGIN := true
+KUBECONFIG ?= $(HOME)/.kube/config
+
+gke-credentials:
 	$(call header,Get GKE Credentials)
+	-rm -f ${KUBECONFIG}
 	gcloud container clusters get-credentials --zone=$(gcp_region) $(gke_name)
 	kubectl config set-context --current --namespace $(gke_namespace)
+
+###############################################################################
+# Proxy
+###############################################################################
+proxy: proxy-up
+
+proxy-up: proxy-down gke-credentials
+	$(call header,Setting SOCKS5 Proxy)
+	gcloud compute ssh ${gke_proxy_name} --ssh-flag="-f" --ssh-flag="-N" --ssh-flag="-D" --ssh-flag="8080"
+	yq -i eval '.clusters[0].cluster.proxy-url = "socks5://127.0.0.1:8080"' ${KUBECONFIG}
+
+proxy-down: secrets-clean
+	-pkill -f 'ssh -t -i'
+
+proxy-status:
+	-lsof -i -P -n | grep "127.0.0.1:8080"
 
 ###############################################################################
 # Helm

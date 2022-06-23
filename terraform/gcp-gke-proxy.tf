@@ -4,6 +4,13 @@ GKE Proxy Host
 
 */
 
+resource "google_compute_address" "gke_proxy1" {
+  project      = var.google_project_id
+  region       = var.google_region
+  name         = "gke-proxy1"
+  address_type = "EXTERNAL"
+}
+
 resource "google_compute_instance" "gke_proxy1" {
   project                   = var.google_project_id
   name                      = "gke-proxy1"
@@ -36,6 +43,9 @@ resource "google_compute_instance" "gke_proxy1" {
 
   network_interface {
     subnetwork = google_compute_subnetwork.gke1.self_link
+    access_config {
+      nat_ip = google_compute_address.gke_proxy1.address
+    }
   }
 
   service_account {
@@ -45,4 +55,8 @@ resource "google_compute_instance" "gke_proxy1" {
   shielded_instance_config {
     enable_secure_boot = true
   }
+
+  depends_on = [
+    google_compute_address.gke_proxy1
+  ]
 }
