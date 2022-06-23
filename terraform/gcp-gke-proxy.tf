@@ -4,6 +4,13 @@ GKE Proxy Host
 
 */
 
+resource "google_compute_address" "gke_proxy1" {
+  project      = var.google_project_id
+  region       = var.google_region
+  name         = "gke-proxy1"
+  address_type = "EXTERNAL"
+}
+
 resource "google_compute_instance" "gke_proxy1" {
   project                   = var.google_project_id
   name                      = "gke-proxy1"
@@ -18,14 +25,6 @@ resource "google_compute_instance" "gke_proxy1" {
     var.google_project_id,
   ]
 
-  metadata = {
-    "user-data" = templatefile("cloud-init/gke-proxy.sh",
-      {
-        google_project_id = var.google_project_id
-      }
-    )
-  }
-
   boot_disk {
     initialize_params {
       image = "ubuntu-os-cloud/ubuntu-minimal-2004-lts"
@@ -36,6 +35,9 @@ resource "google_compute_instance" "gke_proxy1" {
 
   network_interface {
     subnetwork = google_compute_subnetwork.gke1.self_link
+    access_config {
+      nat_ip = google_compute_address.gke_proxy1.address
+    }
   }
 
   service_account {
@@ -45,4 +47,8 @@ resource "google_compute_instance" "gke_proxy1" {
   shielded_instance_config {
     enable_secure_boot = true
   }
+
+  depends_on = [
+    google_compute_address.gke_proxy1
+  ]
 }
