@@ -4,3 +4,4 @@ secrets/*.txt
 terraform/*.json
 terraform/.terraform
 terraform/.terraform.lock.hcl
+terraform/tfplan.bin
