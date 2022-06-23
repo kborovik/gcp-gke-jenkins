@@ -111,7 +111,7 @@ include $(secrets_txt)
 ###############################################################################
 # Terraform
 ###############################################################################
-terraform: terraform-apply
+terraform: secrets-clean terraform-apply
 
 terraform-fmt:
 	$(call header,Checking Terraform Code Formatting)
@@ -255,6 +255,7 @@ gcp-config:
 ###############################################################################
 # GKE Credentials
 ###############################################################################
+USE_GKE_GCLOUD_AUTH_PLUGIN := true
 KUBECONFIG ?= $(HOME)/.kube/config
 
 gke-credentials:
