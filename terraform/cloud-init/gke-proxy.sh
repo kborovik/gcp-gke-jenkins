@@ -7,7 +7,7 @@ curl -fsSL https://as-repository.openvpn.net/as-repo-public.gpg | apt-key add -
 cat <<EOF | tee /etc/apt/sources.list.d/openvpn-as-repo.list
 deb [arch=$(dpkg --print-architecture)] http://as-repository.openvpn.net/as/debian $(lsb_release -cs) main
 EOF
-apt update -y && apt upgrade -y && apt install -y git jq make net-tools openvpn-as tree
+apt update -y && apt upgrade -y && apt install -y less bash-completion git jq make net-tools openvpn-as tree
 # configure OpenVPN
 external_ip=$(curl -sSL http://ipinfo.io | grep '"ip"' | cut -d'"' -f4)
 /usr/local/openvpn_as/scripts/sacli --key "host.name" --value "$external_ip" ConfigPut
@@ -30,7 +30,7 @@ sudo /usr/local/openvpn_as/scripts/sacli --user "$openvpn_user_name" AutoGenerat
 sudo /usr/local/openvpn_as/scripts/sacli --user "$openvpn_user_name" RemoveLocalPassword
 sudo /usr/local/openvpn_as/scripts/sacli --user "$openvpn_user_name" --key "type" --value "user_connect" UserPropPut
 sudo /usr/local/openvpn_as/scripts/sacli --user "$openvpn_user_name" --key "prop_autologin" --value "true" UserPropPut
-sudo /usr/local/openvpn_as/scripts/sacli --user "$openvpn_user_name" GetAutologin | tee "${openvpn_auth_file}"
+sudo /usr/local/openvpn_as/scripts/sacli --user "$openvpn_user_name" GetAutologin | tee "$openvpn_auth_file"
 chmod 0600 "$openvpn_auth_file"
 EOF
 chmod 755 /usr/local/bin/openvpn-create-user.sh

@@ -25,6 +25,14 @@ resource "google_compute_instance" "gke_proxy1" {
     var.google_project_id,
   ]
 
+  metadata = {
+    "user-data" = templatefile("cloud-init/gke-proxy.sh",
+      {
+        google_project_id = var.google_project_id
+      }
+    )
+  }
+
   boot_disk {
     initialize_params {
       image = "ubuntu-os-cloud/ubuntu-minimal-2004-lts"
