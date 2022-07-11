@@ -26,12 +26,6 @@ variable "gke_machine_type" {
   default     = "e2-medium"
 }
 
-variable "gke_master_cidr" {
-  description = "GKE Master CIDR"
-  type        = string
-  default     = null
-}
-
 variable "gke_authorized_networks" {
   description = "GKE Authorized Networks"
   type = list(object({
