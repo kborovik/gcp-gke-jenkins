@@ -72,9 +72,9 @@ settings: secrets-clean
 	echo "# admin_user         = $(admin_user)"
 	echo "# admin_pass         = $(admin_pass)"
 	echo "#"
-	echo "# registry           = $(registry)"
 	echo "# jenkins_img        = $(jenkins_img)"
 	echo "# jenkins_agent_img  = $(jenkins_agent_img)"
+	echo "# jenkins_sa_key     = $(if $(jenkins_sa_key),true,)"
 	echo "#"
 	echo "# PKI_SAN            = $(PKI_SAN)"
 	echo "#"
@@ -153,14 +153,13 @@ terraform-clean:
 ###############################################################################
 # Docker
 ###############################################################################
-docker: secrets-clean docker-build-jenkins docker-build-jenkins-agent docker-build-ubuntu docker-build-kaniko
+docker: secrets-clean docker-auth docker-build-jenkins docker-build-jenkins-agent docker-build-ubuntu
 
-# docker_mount += --mount type=volume,source=kaniko-cache,destination=/cache
-docker_mount += --mount type=bind,source=$${HOME}/.docker,destination=/kaniko/.docker
-docker_mount += --mount type=bind,source=$$(pwd),destination=/workspace
-
-docker_build_arg += --build-arg=kaniko_ver=$(kaniko_ver)
 docker_build_arg += --build-arg=registry_key=$(registry_key)
+
+docker-auth: docker-clean
+	$(call header,Configure Docker Auth)
+	echo $(jenkins_sa_key) | docker login --username _json_key_base64 --password-stdin https://$(gcp_region)-docker.pkg.dev
 
 docker-envsubst:
 	envsubst '$${github_ssh_key} $${gke_namespace}' < docker/github-ssh-key.groovy > docker/github-ssh-key.groovy.txt
@@ -180,18 +179,10 @@ docker-build-ubuntu:
 	docker build $(docker_build_arg) --tag=$(ubuntu_img) --file="docker/Dockerfile.ubuntu" .
 	docker push $(ubuntu_img)
 
-docker-build-kaniko:
-	$(call header,Build Kaniko)
-	docker build $(docker_build_arg) --tag=$(kaniko_img) --file="docker/Dockerfile.kaniko" .
-	docker push $(kaniko_img)
-
-kaniko-build-jenkins-agent:
-	docker run --rm $(docker_mount) $(kaniko_img) --cache --cache-repo $(cache_repo) --reproducible --dockerfile docker/Dockerfile.jenkins-agent --destination $(jenkins_agent_img) --verbosity info
-
 docker-clean:
-	-docker rmi $(jenkins_img) $(jenkins_agent_img) $(ubuntu_img) $(kaniko_img)
 	docker image prune --force
 	docker container prune --force
+	mv -f $(HOME)/.docker/config.json $(HOME)/.docker/_config.json || true
 
 shell-jenkins:
 	docker run -it --rm $(jenkins_img) bash
