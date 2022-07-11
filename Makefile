@@ -50,7 +50,6 @@ admin_user ?= admin
 admin_pass ?=
 admin_ssh ?=
 
-registry_key := $(shell base64 --wrap=0 ${HOME}/.docker/config.json)
 github_ssh_key := $(file < ${HOME}/.ssh/id_rsa)
 
 ###############################################################################
@@ -75,6 +74,7 @@ settings: secrets-clean
 	echo "# jenkins_img        = $(jenkins_img)"
 	echo "# jenkins_agent_img  = $(jenkins_agent_img)"
 	echo "# jenkins_sa_key     = $(if $(jenkins_sa_key),true,)"
+	echo "# registry_key       = $(if $(registry_key),true,)"
 	echo "#"
 	echo "# PKI_SAN            = $(PKI_SAN)"
 	echo "#"
@@ -83,9 +83,9 @@ settings: secrets-clean
 # All
 ###############################################################################
 
-all: secrets-clean prompt terraform ssl
+all: secrets-clean prompt terraform ssl docker helm test
 
-clean: secrets-clean helm-clean docker-clean
+clean: secrets-clean terraform-clean helm-clean docker-clean
 
 ###############################################################################
 # Secrets. Variable values stored in secrets.enc
@@ -155,8 +155,6 @@ terraform-clean:
 ###############################################################################
 docker: secrets-clean docker-auth docker-build-jenkins docker-build-jenkins-agent docker-build-ubuntu
 
-docker_build_arg += --build-arg=registry_key=$(registry_key)
-
 docker-auth: docker-clean
 	$(call header,Configure Docker Auth)
 	echo $(jenkins_sa_key) | docker login --username _json_key_base64 --password-stdin https://$(gcp_region)-docker.pkg.dev
@@ -176,7 +174,7 @@ docker-build-jenkins-agent:
 
 docker-build-ubuntu:
 	$(call header,Build Ubuntu)
-	docker build $(docker_build_arg) --tag=$(ubuntu_img) --file="docker/Dockerfile.ubuntu" .
+	docker build --tag=$(ubuntu_img) --file="docker/Dockerfile.ubuntu" .
 	docker push $(ubuntu_img)
 
 docker-clean:
@@ -238,7 +236,7 @@ ssl-show-jks:
 ###############################################################################
 # GCP Config
 ###############################################################################
-gcp-config:
+gcloud-config:
 	$(call header,Setting gcloud config)
 	gcloud config set core/project ${gcp_project}
 	gcloud config set compute/region ${gcp_region}
@@ -253,19 +251,19 @@ gke-credentials:
 	$(call header,Get GKE Credentials)
 	-rm -f ${KUBECONFIG}
 	gcloud container clusters get-credentials --zone=$(gcp_region) $(gke_name)
+	yq -i eval '.clusters[0].cluster.proxy-url = "socks5://127.0.0.1:8080"' ${KUBECONFIG}
 	kubectl config set-context --current --namespace $(gke_namespace)
 
 ###############################################################################
 # Proxy
 ###############################################################################
-proxy: proxy-up
+proxy: gcloud-config proxy-up
 
-proxy-up: proxy-down gke-credentials
+proxy-up: proxy-down
 	$(call header,Setting SOCKS5 Proxy)
 	gcloud compute ssh ${gke_proxy_name} --ssh-flag="-f" --ssh-flag="-N" --ssh-flag="-D" --ssh-flag="8080"
-	yq -i eval '.clusters[0].cluster.proxy-url = "socks5://127.0.0.1:8080"' ${KUBECONFIG}
 
-proxy-down: secrets-clean
+proxy-down:
 	-pkill -f 'ssh -t -i'
 
 proxy-status:
@@ -274,7 +272,7 @@ proxy-status:
 ###############################################################################
 # Helm
 ###############################################################################
-helm: secrets-clean helm-deploy
+helm: secrets-clean proxy gke-credentials helm-deploy
 
 helm_release := jenkins
 helm_dir := helm/jenkins
@@ -286,14 +284,14 @@ helm_vars += --set adminUser=$(admin_user)
 helm_vars += --set adminPassword=$(admin_pass)
 helm_vars += --set loadBalancerIP=$(jenkins_ip)
 helm_vars += --set keyStorePass=$(master_key)
-ifeq ($(wildcard $(ssl_jks)),)
+ifneq ($(wildcard $(ssl_jks)),)
 helm_vars += --set keyStoreFile=$(shell base64 --wrap=0 $(ssl_jks))
 endif
 
 helm-bootstrap:
 	envsubst '$${admin_user} $${admin_pass} $${admin_ssh} $${gke_namespace} $${ubuntu_img} $${jenkins_img} $${jenkins_agent_img} $${jenkins_ip}' < $(helm_dir)/configs/jcasc-default-config.yaml > $(helm_dir)/configs/jcasc-default-config.txt
 
-helm-deploy: helm-bootstrap
+helm-deploy: helm-bootstrap 
 	$(call header,Deploy Jenkins HELM Chart)
 	helm upgrade $(helm_release) $(helm_dir) --install --create-namespace --namespace ${gke_namespace} ${helm_vars} --wait --timeout=2m --atomic
 
@@ -320,11 +318,11 @@ helm-restart:
 ###############################################################################
 # Functions
 ###############################################################################
-test: secrets-clean test-jenkins-https test-remove-know-hosts test-reload-jcasc test-add-jenkins-job test-start-jenkins-job test-view-jenkins-job
+test: secrets-clean test-jenkins-https
 
 test-jenkins-https:
 	$(call header,Test Jenkins HTTPS Access)
-	curl -X GET -I -L https://$(jenkins_ip)/login
+	curl -X GET -I -L https://$(jenkins_ip)/login --preproxy "socks5://127.0.0.1:8080" --cacert pki/certs/ca-certificates.crt
 
 test-remove-know-hosts:
 	ssh-keygen -f ${HOME}/.ssh/known_hosts -R ${jenkins_ip} >/dev/null
