@@ -1,0 +1,73 @@
+---
+stages:
+  - terraform
+  - helm
+  - tests
+variables:
+  DEPLOYMENT_TOOLS_VER: "2022-07-04"
+  CLOUDSDK_CONFIG: "$CI_PROJECT_DIR/.config/gcloud/"
+  KUBECONFIG: "$CI_PROJECT_DIR/.kube/config"
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event' && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH
+      variables:
+        GOOGLE_PROJECT: "lab5-jenkins-s1"
+    - if: $CI_PIPELINE_SOURCE == 'push' && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      variables:
+        GOOGLE_PROJECT: "lab5-jenkins-d1"
+    - if: $CI_COMMIT_TAG == "lab5-jenkins-q1"
+      variables:
+        GOOGLE_PROJECT: "lab5-jenkins-q1"
+    - if: $CI_COMMIT_TAG == "lab5-jenkins-p1"
+      variables:
+        GOOGLE_PROJECT: "lab5-jenkins-p1"
+image: "us-central1-docker.pkg.dev/${GOOGLE_PROJECT}/docker/deployment-tools:${DEPLOYMENT_TOOLS_VER}"
+terraform:
+  stage: terraform
+  environment:
+    name: ${GOOGLE_PROJECT}
+    action: start
+  tags:
+    - ${GOOGLE_PROJECT}
+  script:
+    - make settings terraform
+  artifacts:
+    paths:
+      - $CI_PROJECT_DIR/terraform/output.json
+    untracked: false
+    expire_in: 1 days
+helm:
+  stage: helm
+  environment:
+    name: ${GOOGLE_PROJECT}
+    action: access
+  tags:
+    - ${GOOGLE_PROJECT}
+  script:
+    - make settings gke-credentials helm
+  dependencies:
+    - terraform
+docker:
+  stage: helm
+  environment:
+    name: ${GOOGLE_PROJECT}
+    action: access
+  tags:
+    - linux
+    - amd64
+    - gen10
+  script:
+    - mkdir -p  ${HOME}/.docker
+    - echo $DOCKER_AUTH_CONFIG > ${HOME}/.docker/config.json
+    - make settings docker-build docker-push
+  dependencies:
+    - terraform
+test:
+  stage: tests
+  environment:
+    name: ${GOOGLE_PROJECT}
+    action: stop
+  tags:
+    - ${GOOGLE_PROJECT}
+  script:
+    - make settings test

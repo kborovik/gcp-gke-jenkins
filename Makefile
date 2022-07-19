@@ -19,16 +19,15 @@ gke_namespace ?= $(shell id --user --name)
 ###############################################################################
 # Static Environment Variables
 ###############################################################################
-gcp_project ?= lab5-jenkins-d1
-gcp_region ?= us-central1
+GOOGLE_PROJECT ?= lab5-jenkins-d1
+GOOGLE_REGION ?= us-central1
 
 terraform_dir := $(abspath terraform)
+terraform_vars := $(terraform_dir)/$(GOOGLE_PROJECT).tfvars
 terraform_output_local := $(terraform_dir)/output.json
-terraform_output_remote := gs://terraform-$(gcp_project)/jenkins/output.json
+terraform_output_remote := gs://terraform-$(GOOGLE_PROJECT)/jenkins/output.json
 
-gcp_project_config := $(terraform_dir)/$(gcp_project).tfvars
-
-registry := $(gcp_region)-docker.pkg.dev/$(gcp_project)/docker
+registry := $(GOOGLE_REGION)-docker.pkg.dev/$(GOOGLE_PROJECT)/docker
 
 ifneq ($(file < $(terraform_output_local)),)
 gke_name := $(shell jq -r ".gke_name.value // empty" $(terraform_output_local))
@@ -58,8 +57,10 @@ github_ssh_key := $(file < ${HOME}/.ssh/id_rsa)
 settings: secrets-clean
 	$(call header,Settings)
 	echo "#"
-	echo "# gcp_project        = $(gcp_project)"
-	echo "# gcp_project_config = $(gcp_project_config)"
+	echo "# GOOGLE_PROJECT     = $(GOOGLE_PROJECT)"
+	echo "#"
+	echo "# terraform_vars     = $(terraform_vars)"
+	echo "#"
 	echo "# gke_name           = $(gke_name)"
 	echo "# gke_namespace      = $(gke_namespace)"
 	echo "# gke_proxy_name     = $(gke_proxy_name)"
@@ -121,17 +122,17 @@ terraform-fmt:
 terraform-init: terraform-fmt
 	$(call header,Running Terraform Init)
 	cd $(terraform_dir)
-	terraform init -upgrade -input=false -reconfigure -backend-config="bucket=terraform-${gcp_project}" -backend-config="prefix=jenkins"
+	terraform init -upgrade -input=false -reconfigure -backend-config="bucket=terraform-${GOOGLE_PROJECT}" -backend-config="prefix=jenkins"
 
 terraform-plan: terraform-init
 	$(call header,Running Terraform Plan)
 	cd $(terraform_dir)
-	terraform plan -var-file="${gcp_project_config}" -input=false -refresh=true
+	terraform plan -var-file="${terraform_vars}" -input=false -refresh=true
 
 terraform-apply: terraform-init
 	$(call header,Running Terraform Apply)
 	cd $(terraform_dir)
-	terraform apply -auto-approve -var-file="${gcp_project_config}" -input=false -refresh=true && terraform output -json -no-color > ${terraform_output_local}
+	terraform apply -auto-approve -var-file="${terraform_vars}" -input=false -refresh=true && terraform output -json -no-color > ${terraform_output_local}
 
 terraform-show:
 	cd $(terraform_dir)
@@ -143,7 +144,7 @@ terraform-state:
 
 terraform-destory:
 	cd $(terraform_dir)
-	terraform plan -destroy -var-file="${gcp_project_config}" -compact-warnings -out tfplan.bin -target="google_container_node_pool.gke1p1" -target="google_container_cluster.gke1" -target="google_compute_instance.gke_proxy1" -target="google_compute_address.gke_proxy1"
+	terraform plan -destroy -var-file="${terraform_vars}" -compact-warnings -out tfplan.bin -target="google_container_node_pool.gke1p1" -target="google_container_cluster.gke1" -target="google_compute_instance.gke_proxy1" -target="google_compute_address.gke_proxy1"
 	terraform apply -destroy tfplan.bin
 	rm -rf tfplan.bin
 
@@ -157,7 +158,7 @@ docker: secrets-clean docker-auth docker-build-jenkins docker-build-jenkins-agen
 
 docker-auth: docker-clean
 	$(call header,Configure Docker Auth)
-	echo $(jenkins_sa_key) | docker login --username _json_key_base64 --password-stdin https://$(gcp_region)-docker.pkg.dev
+	echo $(jenkins_sa_key) | docker login --username _json_key_base64 --password-stdin https://$(GOOGLE_REGION)-docker.pkg.dev
 
 docker-envsubst:
 	envsubst '$${github_ssh_key} $${gke_namespace}' < docker/github-ssh-key.groovy > docker/github-ssh-key.groovy.txt
@@ -238,8 +239,8 @@ ssl-show-jks:
 ###############################################################################
 gcloud-config:
 	$(call header,Setting gcloud config)
-	gcloud config set core/project ${gcp_project}
-	gcloud config set compute/region ${gcp_region}
+	gcloud config set core/project ${GOOGLE_PROJECT}
+	gcloud config set compute/region ${GOOGLE_REGION}
 
 ###############################################################################
 # GKE Credentials
@@ -250,7 +251,7 @@ KUBECONFIG ?= $(HOME)/.kube/config
 gke-credentials:
 	$(call header,Get GKE Credentials)
 	-rm -f ${KUBECONFIG}
-	gcloud container clusters get-credentials --zone=$(gcp_region) $(gke_name)
+	gcloud container clusters get-credentials --zone=$(GOOGLE_REGION) $(gke_name)
 	yq -i eval '.clusters[0].cluster.proxy-url = "socks5://127.0.0.1:8080"' ${KUBECONFIG}
 	kubectl config set-context --current --namespace $(gke_namespace)
 
@@ -400,6 +401,6 @@ ifeq ($(wildcard $(secrets_enc)),)
 $(error File '$(secrets_enc)' not found. Run | touch $(secrets_enc) && sleep 2 && echo "admin_pass := BlueCat" > $(secrets_txt) && make secrets-encrypt |)
 endif
 
-ifeq ($(file < $(gcp_project_config)),)
-$(error Missing Terraform GCP Project config $(gcp_project_config))
+ifeq ($(file < $(terraform_vars)),)
+$(error Missing Terraform GCP Project config $(terraform_vars))
 endif
